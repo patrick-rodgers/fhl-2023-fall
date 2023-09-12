@@ -1,3 +1,7 @@
+# Local settings.js
+src/node-auth-settings.ts
+lib
+
 # Logs
 logs
 *.log
