@@ -1,6 +1,6 @@
-import { opMap } from "./ops.js";
+import { opMap } from "../ops.js";
 import { xml2js } from "xml-js";
-import { ParserField, str } from "./parsers.js";
+import { ParserField, str } from "../parsers.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 

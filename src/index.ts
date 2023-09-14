@@ -1,12 +1,15 @@
 import { opMap, combine, RequestHook, toUrlAndMethod, ValidHttpMethod } from "./ops.js";
 import { GraphService } from "./generated-types.js";
+import { Batchable, BatchableFunc, ITarget } from "./types.js";
 
-export interface ITarget extends GraphService {
-    _baseUrl: string;
-    _paths: string[],
-    _op: (...args: any[]) => Promise<any>;
-    _query: Map<string, string>;
-}
+export {
+    json,
+    str,
+    ParserField,
+} from "./parsers.js";
+
+// this will export all the enums
+export * from "./types.js";
 
 export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 
@@ -87,10 +90,30 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
     });
 }
 
-export type BatchableFunc = (...args: any[]) => Promise<any>
-export type Batchable = BatchableFunc | [BatchableFunc, [...args: any[]]];
-
 export async function batch(...reqs: Batchable[]): Promise<any[]> {
+
+    function makeUrlRelative(url: string): string {
+
+        let index = url.indexOf("/v1.0/");
+    
+        if (index < 0) {
+    
+            index = url.indexOf("/beta/");
+    
+            if (index > -1) {
+    
+                // beta url
+                return url.substring(index + 6);
+            }
+    
+        } else {
+            // v1.0 url
+            return url.substring(index + 5);
+        }
+    
+        // no idea
+        return url;
+    }
 
     const batchRequest = graph();
     (<any>batchRequest)._baseUrl = combine((<any>graph())._baseUrl, "$batch");
@@ -135,27 +158,4 @@ export async function batch(...reqs: Batchable[]): Promise<any[]> {
     }))];
 
     return (<any>batchRequest)({ requests }).then(response => response.responses);
-}
-
-function makeUrlRelative(url: string): string {
-
-    let index = url.indexOf("/v1.0/");
-
-    if (index < 0) {
-
-        index = url.indexOf("/beta/");
-
-        if (index > -1) {
-
-            // beta url
-            return url.substring(index + 6);
-        }
-
-    } else {
-        // v1.0 url
-        return url.substring(index + 5);
-    }
-
-    // no idea
-    return url;
 }

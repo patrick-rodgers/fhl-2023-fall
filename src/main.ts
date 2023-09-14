@@ -1,4 +1,4 @@
-import { graph, batch } from "./graph-service.js";
+import { graph, batch } from "./index.js";
 
 // const b = await batch(
 //     graph().drives.byId("b!kJTEPDJfE0angPdqCspVt89RXKe8TrtBtHb3i6IU9QiQ0k0wD9ocQqORW-ET3eMU").root.children,

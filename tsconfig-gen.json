@@ -30,6 +30,6 @@
         "resolveJsonModule": true
     },
     "include": [
-        "./src/gen.ts"
+        "./src/gen/gen.ts"
     ]
 }

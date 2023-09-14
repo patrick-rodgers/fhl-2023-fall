@@ -1,4 +1,4 @@
-import { ITarget } from "./graph-service.js";
+import { ITarget } from "./types.js";
 import { getAuthorizationHeaderValue } from "./node-auth.js";
 import { default as nodeFetch } from "node-fetch";
 import { json, ParserField } from "./parsers.js";
