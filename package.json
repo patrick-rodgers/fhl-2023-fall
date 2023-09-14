@@ -1,13 +1,14 @@
 {
-  "name": "fhl",
+  "name": "nanograph",
   "version": "0.0.1",
   "description": "",
   "main": "lib/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc -p .",
-    "gen": "npm run build && node ./lib/gen.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "gen": "tsc -p ./tsconfig-gen.json && node ./lib/gen.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "shrink": "npm run build && minify lib -d min --sourceType module"
   },
   "repository": {
     "type": "git",
@@ -21,11 +22,11 @@
   "homepage": "https://github.com/patrick-rodgers/fhl-2023-fall#readme",
   "dependencies": {
     "@azure/msal-node": "^2.1.0",
-    "@pnp/core": "^3.18.0",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^18.17.15",
+    "babel-minify": "^0.5.2",
     "typescript": "^5.2.2",
     "xml-js": "^1.6.11"
   }

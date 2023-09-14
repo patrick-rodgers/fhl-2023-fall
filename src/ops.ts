@@ -1,33 +1,73 @@
-import { combine } from "@pnp/core";
-import { ITarget } from "./main.js";
+import { ITarget } from "./graph-service.js";
 import { getAuthorizationHeaderValue } from "./node-auth.js";
 import { default as nodeFetch } from "node-fetch";
 import { json, ParserField } from "./parsers.js";
 
-const urlBase = "https://graph.microsoft.com/v1.0";
+export type ValidHttpMethod = "GET" | "POST" | "DELETE";
+export const RequestHook = Symbol.for("RequestHook");
+export type RequestHookFunc = (target: ITarget, method: string, userInit?: Partial<RequestInit>) => any;
 
-export async function get<T>(this: ITarget, init: RequestInit): Promise<T> {
+export function toUrlAndMethod(target: ITarget, method: ValidHttpMethod): [method: ValidHttpMethod, url: string] {
 
-    const url = combine(urlBase, ...this.paths);
+    const query = [];
+    for (const item of target._query) {
+        query.push(`${item[0]}=${encodeURIComponent(item[1])}`);
+    }
 
-    const authHeader = await getAuthorizationHeaderValue();
+    return [method, `${combine(target._baseUrl, ...target._paths)}${query.length > 0 ? `?${query.join("&")}` : ""}`];
+}
 
-    const builtInit = {
-        method: "GET",
+export async function request<T>(target: ITarget, method: ValidHttpMethod, userInit?: Partial<RequestInit>): Promise<T> {
+
+    if (typeof target[RequestHook] === "function") {
+        return target[RequestHook](target, method, userInit);
+    }
+
+    const query = [];
+    for (const item of target._query) {
+        query.push(`${item[0]}=${encodeURIComponent(item[1])}`);
+    }
+
+    const [, url] = toUrlAndMethod(target, method);
+
+    console.log(`Request URL: ${method} ${url}`);
+
+    const init = {
+        method,
         cache: "default",
         credentials: "same-origin",
         headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json", 
-            "Authorization": authHeader,
+            "Accept": "application/json",
+            "Authorization": await getAuthorizationHeaderValue(),
         },
-        ...init
-    };
+        ...userInit
+    }
 
-    const result = await nodeFetch(url, <any>builtInit);
-
-    return (this[ParserField] || json)(result);
+    return nodeFetch(url, <any>init).then(result => <T>(target[ParserField] || json)(result));
 }
 
+export const opMap = new Map<string, (this: ITarget, ...args: any[]) => any>();
 
+opMap.set("get", function <T>(this: ITarget, userInit: RequestInit): Promise<T> {
+    return request<T>(this, "GET", userInit);
+});
 
+opMap.set("update", function <T>(this: ITarget, body: any): Promise<T> {
+    return request<T>(this, "POST", { body: JSON.stringify(body) });
+});
+
+opMap.set("add", function <T>(this: ITarget, body: any): Promise<T> {
+    return request<T>(this, "POST", { body: JSON.stringify(body) });
+});
+
+opMap.set("delete", function <T>(this: ITarget): Promise<T> {
+    return request<T>(this, "DELETE");
+});
+
+export function combine(...paths: string[]): string {
+    return paths
+        .map(path => path!.replace(/^[\\|/]/, "").replace(/[\\|/]$/, ""))
+        .join("/")
+        .replace(/\\/g, "/");
+}

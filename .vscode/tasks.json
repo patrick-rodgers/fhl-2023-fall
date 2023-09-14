@@ -4,8 +4,12 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "tsc -p .",
-            "args": [],
+            "command": "npx",
+            "args": [
+                "tsc",
+                "-p",
+                "."
+            ],
             "problemMatcher": [
                 "$tsc",
                 "$jshint"

@@ -1,45 +1,43 @@
-import { IGraph } from "./types.js";
-import { get } from "./ops.js";
+import { graph, batch } from "./graph-service.js";
 
-export interface ITarget extends IGraph {
-    paths: string[],
+// const b = await batch(
+//     graph().drives.byId("b!kJTEPDJfE0angPdqCspVt89RXKe8TrtBtHb3i6IU9QiQ0k0wD9ocQqORW-ET3eMU").root.children,
+//     graph().sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").select("siteCollection", "webUrl"),
+//     [graph().sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").lists.byId("7b5fb91d-8bf0-4435-8f7c-3cea370cde21").items.add, [{
+//         fields: <any>{
+//             Title: "Testing testing testing"
+//         }
+//     }]]
+// );
+
+
+
+// const y = await graph().drives.byId("b!kJTEPDJfE0angPdqCspVt89RXKe8TrtBtHb3i6IU9QiQ0k0wD9ocQqORW-ET3eMU").root.children();
+
+// const u = await graph.sites.select("siteCollection", "webUrl").filter("siteCollection/root ne null")();
+
+// const u = await graph.sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").select("siteCollection", "webUrl")();
+
+// await graph.sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").lists.byId("7b5fb91d-8bf0-4435-8f7c-3cea370cde21").items.add({
+//     fields: <any>{
+//         Title: "Testing testing testing"
+//     }
+// });
+
+// const u = await graph.sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").lists.byId("7b5fb91d-8bf0-4435-8f7c-3cea370cde21").items.byId("81").delete();
+
+// const u = await graph.sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").lists.byId("7b5fb91d-8bf0-4435-8f7c-3cea370cde21").items.top(2)();
+
+// console.log(JSON.stringify(u, null, 2));
+
+const itemCollector = [];
+for await (let items of graph().sites.byId("318studios.sharepoint.com,80c0b48a-973d-4586-9c73-ecd5cecdd0e6,2cbc891c-749e-46fc-be2c-e5d53d80acff").lists.byId("7b5fb91d-8bf0-4435-8f7c-3cea370cde21").items.top(20)) {
+    itemCollector.push(...items);
 }
+console.log(itemCollector.length);
 
-const g = function () {
-    console.log("this one?");
-}
-g.paths = [];
 
-const p2 = new Proxy<IGraph>(<any>g, {
 
-    apply(target, thisArg, argArray) {
-        return get.call(target, ...argArray);
-    },
 
-    get(target: ITarget, p, receiver) {
-
-        console.log(`get = ${String(p)}`);
-
-        if (String(p) === "get") {
-            console.log(`here::>`)
-            // return get.bind(target, argArray);
-        } else {
-            target.paths.push(String(p));
-        }
-
-        // just keep giving the 
-        return receiver;
-    },
-    has(target, p) {
-        console.log(`has = ${String(p)}`);
-        return true;
-    },
-});
-
-const y = await p2.drives({
-    cache: "default",
-});
-
-const h = 99;
 
 

@@ -52,7 +52,7 @@
       "program": "${workspaceRoot}/src/gen.ts",
       "args": [],
       "cwd": "${workspaceRoot}",
-      "preLaunchTask": "build-watch",
+      "preLaunchTask": "build",
       "runtimeExecutable": null,
       "runtimeArgs": [
         "--nolazy"
@@ -66,6 +66,6 @@
       "skipFiles": [
         "<node_internals>/**"
       ]
-    }
+    },
   ]
 }

@@ -1,6 +1,7 @@
 # Local settings.js
 src/node-auth-settings.ts
 lib
+min
 
 # Logs
 logs
