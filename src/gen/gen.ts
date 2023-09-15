@@ -8,6 +8,7 @@ const docCachePath = "./metadata.xml";
 const outPath = "./src/generated-types.ts"
 
 type EntityMap = Map<string, string[]>;
+type ParamsMap = Map<string, [boolean, string[]]>;
 
 async function generateTypings(): Promise<void> {
 
@@ -19,12 +20,12 @@ async function generateTypings(): Promise<void> {
     fileBuilder.push(`export const KeyProperty = Symbol.for("key");`);
 
     fileBuilder.push("export type Gettable<T = {}> = {");
-    fileBuilder.push("(init?: RequestInit): Promise<PropertiesOf<T>>;");
+    // fileBuilder.push("(init?: RequestInit): Promise<PropertiesOf<T>>;");
     fileBuilder.push("get(init?: RequestInit): Promise<PropertiesOf<T>>;");
     fileBuilder.push("}");
 
     fileBuilder.push("export type ColGettable<T = {}> = {");
-    fileBuilder.push("(init?: RequestInit): Promise<T>;");
+    // fileBuilder.push("(init?: RequestInit): Promise<T>;");
     fileBuilder.push("get(init?: RequestInit): Promise<T>;");
     fileBuilder.push("}");
 
@@ -66,6 +67,7 @@ async function generateTypings(): Promise<void> {
 
     // this tracks the entities as we build the strings
     const entityMap: EntityMap = new Map<string, string[]>();
+    const paramTypeMap: ParamsMap = new Map<string, [boolean, string[]]>();
 
     let metadataDoc = "";
 
@@ -75,7 +77,7 @@ async function generateTypings(): Promise<void> {
 
     } else {
 
-        metadataDoc = await opMap.get("get").call({
+        metadataDoc = await opMap.get("get")!.call({
             [ParserField]: str,
             paths: ["$metadata"],
         });
@@ -93,30 +95,29 @@ async function generateTypings(): Promise<void> {
 
     while (elements.length > 0) {
 
-        processElements(entityMap, elements, skippedElements);
+        processElements(entityMap, paramTypeMap, elements, skippedElements);
         elements = [...skippedElements];
         skippedElements.length = 0;
     }
 
     // map the entity map into a string
-    for (const [key, value] of entityMap) {
-
-        // console.log(`Writing [${key}]`);
+    for (const [, value] of entityMap) {
 
         fileBuilder.push(...value);
         // everything leaves off the final '}' so the entities can be added to as they go, we close them here.
         fileBuilder.push("}");
     }
 
+    // now we write in some parameter mapping information so we can make function/action requests correctly
+    fileBuilder.push("export const paramMap: Map<string, [boolean, string[]]> = new Map([");
+    paramTypeMap.forEach((v, k) => {
+        fileBuilder.push(`["${k}", [${v[0]}, [${v[1].map(p => `"${p}"`)}]]],`);
+    });
+    fileBuilder.push("]);");
     writeFileSync(resolvedOutPath, fileBuilder.join("\n"))
 }
 
 await generateTypings();
-
-const enum Bob {
-    Jim = 1,
-    John = 2
-}
 
 interface IEnumElement {
     attributes: {
@@ -131,7 +132,7 @@ interface IEnumElement {
     }[]
 }
 
-function processElements(entityMap: EntityMap, elements: any[], skippedElements: any[]) {
+function processElements(entityMap: EntityMap, paramTypeMap: ParamsMap, elements: any[], skippedElements: any[]) {
 
     const thing = [];
 
@@ -157,10 +158,10 @@ function processElements(entityMap: EntityMap, elements: any[], skippedElements:
                         complexTypeWriter(entityMap, dataService.elements[j]);
                         break;
                     case "Function":
-                        functionWrite(entityMap, dataService.elements[j], skippedElements);
+                        functionWrite(entityMap, paramTypeMap, dataService.elements[j], skippedElements);
                         break;
                     case "Action":
-                        actionWrite(entityMap, dataService.elements[j], skippedElements);
+                        actionWrite(entityMap, paramTypeMap, dataService.elements[j], skippedElements);
                         break;
                     case "EntityContainer":
                         containerWrite(entityMap, dataService.elements[j]);
@@ -248,7 +249,7 @@ function cleanType(type: string): string {
     } else if (type.startsWith("Collection(")) {
 
         const nm = /Collection\((.*?)\)/i.exec(type);
-        const cleanedCollectionType = cleanType(nm[1]);
+        const cleanedCollectionType = cleanType(nm![1]);
         type = `Collection<${cleanedCollectionType}>`;
 
     } else {
@@ -505,7 +506,7 @@ interface IFunctionElement {
     })[];
 }
 
-function functionWrite(map: EntityMap, functionElement: IFunctionElement, skippedElements: any[]): void {
+function functionWrite(map: EntityMap, paramTypeMap: ParamsMap, functionElement: IFunctionElement, skippedElements: any[]): void {
 
     const functionName = cleanName(functionElement.attributes.Name);
     let bindingHostName = "";
@@ -515,6 +516,7 @@ function functionWrite(map: EntityMap, functionElement: IFunctionElement, skippe
 
         const functionBuilder = [`${functionName}(`];
         const paramBuilder = [];
+        const paramTemplateBuilder: string[] = [];
 
         for (let x = 0; x < functionElement.elements.length; x++) {
 
@@ -536,6 +538,7 @@ function functionWrite(map: EntityMap, functionElement: IFunctionElement, skippe
                 const paramType = cleanType(params.attributes.Type);
 
                 paramBuilder.push(`${paramName}: ${paramType}`);
+                paramTemplateBuilder.push(paramName);
 
             } else if (params.name === "ReturnType") {
 
@@ -553,6 +556,7 @@ function functionWrite(map: EntityMap, functionElement: IFunctionElement, skippe
                 functionBuilder.push("): void;");
             }
 
+            paramTypeMap.set(`${bindingHostName}:${functionName}`, [true, paramTemplateBuilder]);
             map.get(bindingHostName).push(functionBuilder.join(""));
         }
     }
@@ -579,7 +583,7 @@ interface IActionElement {
     })[];
 }
 
-function actionWrite(map: EntityMap, actionElement: IActionElement, skippedElements: any[]): void {
+function actionWrite(map: EntityMap, paramTypeMap: ParamsMap, actionElement: IActionElement, skippedElements: any[]): void {
 
     const functionName = cleanName(actionElement.attributes.Name);
     let bindingHostName = "";
@@ -589,6 +593,7 @@ function actionWrite(map: EntityMap, actionElement: IActionElement, skippedEleme
 
         const functionBuilder = [`${functionName}(`];
         const paramBuilder = [];
+        const paramTemplateBuilder: string[] = [];
 
         for (let x = 0; x < actionElement.elements.length; x++) {
 
@@ -610,6 +615,7 @@ function actionWrite(map: EntityMap, actionElement: IActionElement, skippedEleme
                 const paramType = cleanType(params.attributes.Type);
 
                 paramBuilder.push(`${paramName}: ${paramType}`);
+                paramTemplateBuilder.push(paramName);
 
             } else if (params.name === "ReturnType") {
 
@@ -627,6 +633,7 @@ function actionWrite(map: EntityMap, actionElement: IActionElement, skippedEleme
                 functionBuilder.push("): void;");
             }
 
+            paramTypeMap.set(`${bindingHostName}:${functionName}`, [false, paramTemplateBuilder]);
             map.get(bindingHostName).push(functionBuilder.join(""));
         }
     }

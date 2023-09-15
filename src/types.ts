@@ -8,4 +8,6 @@ export interface ITarget extends GraphService {
     _paths: string[],
     _op: (...args: any[]) => Promise<any>;
     _query: Map<string, string>;
+    _flag: boolean;
+    _lastEntity: string;
 }

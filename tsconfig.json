@@ -3,7 +3,6 @@
         "target": "ES2019",
         "module": "esnext",
         "declaration": true,
-        "declarationMap": true,
         "removeComments": true,
         "lib": [
             "ES2015",
@@ -25,10 +24,9 @@
         "skipDefaultLibCheck": true,
         "skipLibCheck": true,
         "strictNullChecks": false,
-        "importHelpers": true,
-        "resolveJsonModule": true
+        "importHelpers": true
     },
     "include": [
-        "./src/*.ts"
+        "./src/**/*.ts"
     ]
 }

@@ -1,5 +1,5 @@
 import { opMap, combine, RequestHook, toUrlAndMethod, ValidHttpMethod } from "./ops.js";
-import { GraphService } from "./generated-types.js";
+import { GraphService, paramMap } from "./generated-types.js";
 import { Batchable, BatchableFunc, ITarget } from "./types.js";
 
 export {
@@ -13,15 +13,36 @@ export * from "./types.js";
 
 export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 
-    const proxyBase = function () { };
+    const proxyBase = function () {
+        console.log("this");
+    };
     proxyBase._baseUrl = baseUrl;
     proxyBase._paths = [];
     proxyBase._op = opMap.get("get");
     proxyBase._query = new Map<string, string>();
+    proxyBase._flag = false;
+    proxyBase._lastEntity = null;
 
     return new Proxy<GraphService>(<any>proxyBase, {
 
         apply(target: ITarget, _thisArg, argArray) {
+
+            // we are invoking a function that isn't one of our pre-handled ones
+            if (target._flag) {
+
+                const opName = target._paths[target._paths.length - 1];
+                const params = paramMap.get(`${target._lastEntity}:${opName}`);
+
+                // functions use get, actions use post w/ body args (https://learn.microsoft.com/en-us/odata/webapi-8/fundamentals/actions-functions)
+                if (params[0]) {
+                    target._op = opMap.get("get");
+                    target._paths[target._paths.length - 1] += `(${params[1].map((v, i) => (`${v}='${argArray[i]}'`)).join(",")})`;
+                } else {
+                    target._op = opMap.get("update");
+                    argArray = [params[1].reduce((a, v, i) => ({ ...a, [v]: argArray[i] }), {})];
+                }
+            }
+
             return target._op.call(target, ...argArray);
         },
 
@@ -34,6 +55,8 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
                 return Reflect.get(target, name);
             }
 
+            target._flag = false;
+
             switch (name) {
                 case "get":
                 case "update":
@@ -43,6 +66,7 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
                     break;
                 case "byId":
                     return (id: string) => {
+                        target._lastEntity = target._paths[target._paths.length - 1].replace(/s$/i, "");
                         target._paths.push(id);
                         return receiver;
                     }
@@ -80,6 +104,7 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 
                     });
                 default:
+                    target._flag = true;
                     target._paths.push(name);
                     break;
             }
@@ -95,22 +120,22 @@ export async function batch(...reqs: Batchable[]): Promise<any[]> {
     function makeUrlRelative(url: string): string {
 
         let index = url.indexOf("/v1.0/");
-    
+
         if (index < 0) {
-    
+
             index = url.indexOf("/beta/");
-    
+
             if (index > -1) {
-    
+
                 // beta url
                 return url.substring(index + 6);
             }
-    
+
         } else {
             // v1.0 url
             return url.substring(index + 5);
         }
-    
+
         // no idea
         return url;
     }
@@ -133,6 +158,7 @@ export async function batch(...reqs: Batchable[]): Promise<any[]> {
 
             extraInit = (init: any) => {
                 if (init?.body && typeof init.body === "string") {
+                    // we need to parse the previously encoded
                     init.body = JSON.parse(init.body);
                 }
                 return {

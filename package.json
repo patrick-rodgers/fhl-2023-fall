@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p .",
-    "gen": "tsc -p ./tsconfig-gen.json && node ./lib/gen.js",
+    "gen": "tsc -p ./tsconfig-gen.json && node ./lib/gen/gen.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "shrink": "npm run build && minify lib -d min --sourceType module"
   },
