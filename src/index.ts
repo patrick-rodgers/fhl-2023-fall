@@ -1,5 +1,5 @@
 import { opMap, combine, RequestHook, toUrlAndMethod, ValidHttpMethod } from "./ops.js";
-import { GraphService, paramMap } from "./generated-types.js";
+import { GraphService, extension, paramMap } from "./generated-types.js";
 import { Batchable, BatchableFunc, ITarget } from "./types.js";
 
 export {
@@ -13,9 +13,7 @@ export * from "./types.js";
 
 export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 
-    const proxyBase = function () {
-        console.log("this");
-    };
+    const proxyBase = function () { };
     proxyBase._baseUrl = baseUrl;
     proxyBase._paths = [];
     proxyBase._op = opMap.get("get");
@@ -48,14 +46,13 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 
         get(target: ITarget, p, receiver) {
 
+            target._flag = false;
             const name = String(p);
 
             // allow internal property access
             if (Reflect.has(target, name)) {
                 return Reflect.get(target, name);
             }
-
-            target._flag = false;
 
             switch (name) {
                 case "get":
@@ -66,6 +63,7 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
                     break;
                 case "byId":
                     return (id: string) => {
+                        // turns sites into site because our function names are indexed on functionName:ParamObjectName
                         target._lastEntity = target._paths[target._paths.length - 1].replace(/s$/i, "");
                         target._paths.push(id);
                         return receiver;
@@ -118,38 +116,23 @@ export function graph(baseUrl = "https://graph.microsoft.com/v1.0") {
 export async function batch(...reqs: Batchable[]): Promise<any[]> {
 
     function makeUrlRelative(url: string): string {
-
-        let index = url.indexOf("/v1.0/");
-
-        if (index < 0) {
-
-            index = url.indexOf("/beta/");
-
-            if (index > -1) {
-
-                // beta url
-                return url.substring(index + 6);
-            }
-
-        } else {
-            // v1.0 url
-            return url.substring(index + 5);
-        }
-
-        // no idea
-        return url;
+        const rel = /(\/v1\.0\/|\/beta\/)(.*)$/i.exec(url);
+        return rel.length > 2 ? rel[2] : url;
     }
 
     const batchRequest = graph();
     (<any>batchRequest)._baseUrl = combine((<any>graph())._baseUrl, "$batch");
-    // update does a post and support a body
+    // update does a post and supports a body
     (<any>batchRequest)._op = opMap.get("update");
 
     const requests = [...await Promise.all(reqs.map(async (req, i) => {
 
         let _req: BatchableFunc = <any>req;
         let _args = [];
-        let extraInit: <T>(o: T) => T = (o) => o;
+        // allows us to nest init updates
+        let extraInit: (init: any) => Partial<RequestInit> = (o) => o;
+
+        // we use an array to allow for passing params to a function call in a batch
         if (Array.isArray(req)) {
             _req = req[0];
             if (req.length > 1) {
@@ -157,10 +140,12 @@ export async function batch(...reqs: Batchable[]): Promise<any[]> {
             }
 
             extraInit = (init: any) => {
+
                 if (init?.body && typeof init.body === "string") {
                     // we need to parse the previously encoded
                     init.body = JSON.parse(init.body);
                 }
+
                 return {
                     ...init,
                     headers: {
@@ -171,9 +156,12 @@ export async function batch(...reqs: Batchable[]): Promise<any[]> {
             }
         }
 
+        // we grab a ref to the request hook and replace the default behavior with the below
         _req[RequestHook] = (target: ITarget, m: ValidHttpMethod, userInit?: Partial<RequestInit>) => [...toUrlAndMethod(target, m), userInit];
+        // then we invoke the request, but since we did the above it runs that instead of the http send operation and we get back this info to build the batch
         const [method, url, init] = await _req(..._args);
 
+        // send back a json representation of this request
         return extraInit({
             id: i + 1,
             method,
